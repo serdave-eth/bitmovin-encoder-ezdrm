@@ -1,28 +1,19 @@
 import time
 from os import path
 
-from bitmovin_api_sdk import AacAudioConfiguration, AclEntry, AclPermission, BitmovinApi, \
-    BitmovinApiLogger, CencDrm, CencWidevine, CodecConfiguration, DashManifest, \
-    DashManifestDefault, DashManifestDefaultVersion, Encoding, EncodingOutput, Fmp4Muxing, \
-    H264VideoConfiguration, HlsManifest, HlsManifestDefault, HlsManifestDefaultVersion, HttpInput, \
-    Input, ManifestGenerator, ManifestResource, MessageType, Muxing, MuxingStream, Output, \
-    PresetConfiguration, S3Output, StartEncodingRequest, Status, Stream, StreamInput, StreamSelectionMode, Task
+#from bitmovin_api_sdk import AacAudioConfiguration, AclEntry, AclPermission, BitmovinApi, \
+#    BitmovinApiLogger, CencDrm, CencWidevine, CencPlayReady, CencFairPlay, CodecConfiguration, DashManifest, \
+#    DashManifestDefault, DashManifestDefaultVersion, Encoding, EncodingOutput, Fmp4Muxing, \
+#    H264VideoConfiguration, HlsManifest, HlsManifestDefault, HlsManifestDefaultVersion, HttpInput, \
+#    Input, ManifestGenerator, ManifestResource, MessageType, Muxing, MuxingStream, Output, \
+#    PresetConfiguration, S3Output, StartEncodingRequest, Status, Stream, StreamInput, StreamSelectionMode, Task
+
+from bitmovin_api_sdk import *
 
 # Hardcoded configuration parameters
-BITMOVIN_API_KEY = ""
-HTTP_INPUT_HOST = "www.dropbox.com"
-HTTP_INPUT_FILE_PATH = "" #when you get the shareable link from dropbox, everything from the backslash onwards should go here. Change dl=0 to dl=1
-S3_OUTPUT_BUCKET_NAME = "bitmovinstudio256"
-S3_OUTPUT_ACCESS_KEY = "" # When you set up the S3 bucket, make sure that programmatic access is enabled. Once it is you can get the access key and secret key.
-S3_OUTPUT_SECRET_KEY = ""
-S3_OUTPUT_BASE_PATH = "output" # Make sure you have no back slash here
-DRM_KEY = ""
-#DRM_FAIRPLAY_IV = "your-16-byte-fairplay-iv"
-#DRM_FAIRPLAY_URI = "your-fairplay-uri"
-DRM_WIDEVINE_KID = "" #EZDRM Widevine KID Hex
-DRM_WIDEVINE_PSSH = "" #EZDRM Widevine PSSH
 
-EXAMPLE_NAME = "CencDrmContentProtection" # This is the name of the folder that will be added to the output S3 bucket
+
+EXAMPLE_NAME = "CencDrmContentProtectionPlayreadyEnabled_Fairplay" # This is the name of the folder that will be added to the output S3 bucket
 bitmovin_api = BitmovinApi(api_key=BITMOVIN_API_KEY, logger=BitmovinApiLogger())
 
 def main():
@@ -31,13 +22,15 @@ def main():
     http_input = _create_http_input(host=HTTP_INPUT_HOST)
     input_file_path = HTTP_INPUT_FILE_PATH
 
-    output = _create_s3_output(
-        bucket_name=S3_OUTPUT_BUCKET_NAME,
-        access_key=S3_OUTPUT_ACCESS_KEY,
-        secret_key=S3_OUTPUT_SECRET_KEY
-    )
+    #output = _create_s3_output(
+    #    bucket_name=S3_OUTPUT_BUCKET_NAME,
+    #    access_key=S3_OUTPUT_ACCESS_KEY,
+    #    secret_key=S3_OUTPUT_SECRET_KEY
+    #)
+    output = _get_cdn_output()
 
     h264_video_configuration = _create_h264_video_configuration()
+    
     h264_video_stream = _create_stream(
         encoding=encoding,
         encoding_input=http_input,
@@ -70,6 +63,17 @@ def main():
 
     _execute_encoding(encoding=encoding, start_encoding_request=start_encoding_request)
 
+def _get_cdn_output() -> CdnOutput:
+    """
+    Retrieves the singleton CdnOutput resource that exists for every organization
+
+    <p>API endpoint:
+    https://bitmovin.com/docs/encoding/api-reference/all#/Encoding/GetEncodingOutputsCdn
+    """
+    cdn_outputs = bitmovin_api.encoding.outputs.cdn.list().items
+
+    return cdn_outputs[0]
+
 def _create_encoding(name, description):
     encoding = Encoding(name=name, description=description)
     return bitmovin_api.encoding.encodings.create(encoding=encoding)
@@ -101,7 +105,9 @@ def _create_fmp4_muxing(encoding, stream):
 
 def _create_drm_config(encoding, muxing, output, output_path):
     widevine_drm = CencWidevine(pssh=DRM_WIDEVINE_PSSH)
-    cenc_drm = CencDrm(outputs=[_build_encoding_output(output=output, output_path=output_path)], key=DRM_KEY, kid=DRM_WIDEVINE_KID, widevine=widevine_drm)
+    playready_drm = CencPlayReady(la_url=DRM_FAIRPLAY_LAURL)
+    fairplay_drm = CencFairPlay(iv=DRM_FAIRPLAY_IV,uri=DRM_FAIRPLAY_URI)
+    cenc_drm = CencDrm(outputs=[_build_encoding_output(output=output, output_path=output_path)], key=DRM_KEY, kid=DRM_WIDEVINE_KID, play_ready=playready_drm, widevine=widevine_drm, fair_play=fairplay_drm)
     return bitmovin_api.encoding.encodings.muxings.fmp4.drm.cenc.create(encoding_id=encoding.id, muxing_id=muxing.id, cenc_drm=cenc_drm)
 
 def _create_default_dash_manifest(encoding, output, output_path):
