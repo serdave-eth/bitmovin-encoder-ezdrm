@@ -1,4 +1,5 @@
 import time
+from datetime import datetime
 from os import path
 #from bitmovin_api_sdk import AacAudioConfiguration, AclEntry, AclPermission, BitmovinApi, \
 #    BitmovinApiLogger, CodecConfiguration, DashManifest, DashManifestDefault, \
@@ -11,16 +12,22 @@ from bitmovin_api_sdk import *
 # Hardcoded configuration parameters
 BITMOVIN_API_KEY = ""
 HTTP_INPUT_HOST = ""
-HTTP_INPUT_FILE_PATH = ""
+HTTP_INPUT_FILE_PATH = "" #when you get the shareable link from dropbox, everything from the backslash onwards should go here. Change dl=0 to dl=1
 S3_OUTPUT_BUCKET_NAME = ""
-S3_OUTPUT_ACCESS_KEY = ""
+S3_OUTPUT_ACCESS_KEY = "" # When you set up the S3 bucket, make sure that programmatic access is enabled. Once it is you can get the access key and secret key.
 S3_OUTPUT_SECRET_KEY = ""
-S3_OUTPUT_BASE_PATH = ""
+#S3_OUTPUT_BASE_PATH = "output" # Make sure you have no back slash here
 DRM_KEY = ""
+DRM_FAIRPLAY_IV = ""
+DRM_FAIRPLAY_URI = ""
 DRM_WIDEVINE_KID = "" #EZDRM Widevine KID Hex
 DRM_WIDEVINE_PSSH = "" #EZDRM Widevine PSSH
+DRM_FAIRPLAY_LAURL = ""
+EXAMPLE_NAME = "" # This is the name of the folder that will be added to the output S3 bucket
+# Generate a unique suffix for the output path
+timestamp_suffix = datetime.now().strftime("%Y%m%d%H%M%S")
 
-EXAMPLE_NAME = ""
+S3_OUTPUT_BASE_PATH = f"output/{EXAMPLE_NAME}_{timestamp_suffix}/"
 bitmovin_api = BitmovinApi(api_key=BITMOVIN_API_KEY, logger=BitmovinApiLogger())
 
 def main():
@@ -45,8 +52,8 @@ def main():
 
     for config in video_configurations:
         video_stream = _create_stream(encoding=encoding, encoding_input=http_input, input_path=HTTP_INPUT_FILE_PATH, codec_configuration=config)
-        video_muxing = _create_fmp4_muxing(encoding=encoding, output=output, output_path=f"video/{config.bitrate}", stream=video_stream)
-        _create_drm_config(encoding=encoding, muxing=video_muxing, output=output, output_path="video")
+        video_muxing = _create_fmp4_muxing(encoding=encoding, stream=video_stream)
+        _create_drm_config(encoding=encoding, muxing=video_muxing, output=output, output_path=f"video")
 
     audio_configurations = [
         _create_aac_audio_configuration(bitrate=192000),
@@ -55,13 +62,18 @@ def main():
 
     for config in audio_configurations:
         audio_stream = _create_stream(encoding=encoding, encoding_input=http_input, input_path=HTTP_INPUT_FILE_PATH, codec_configuration=config)
-        audio_muxing = _create_fmp4_muxing(encoding=encoding, output=output, output_path=f"audio/{config.bitrate}", stream=audio_stream)
-        _create_drm_config(encoding=encoding, muxing=audio_muxing, output=output, output_path="audio")
+        audio_muxing = _create_fmp4_muxing(encoding=encoding, stream=audio_stream)
+        _create_drm_config(encoding=encoding, muxing=audio_muxing, output=output, output_path=f"audio")
 
     dash_manifest = _create_default_dash_manifest(encoding=encoding, output=output, output_path="")
-    hls_manifest = _create_default_hls_manifest(encoding=encoding, output=output, output_path="")
+    #hls_manifest = _create_default_hls_manifest(encoding=encoding, output=output, output_path="")
 
-    start_encoding_request = StartEncodingRequest(manifest_generator=ManifestGenerator.V2, vod_dash_manifests=[ManifestResource(manifest_id=dash_manifest.id)], vod_hls_manifests=[ManifestResource(manifest_id=hls_manifest.id)])
+    #start_encoding_request = StartEncodingRequest(manifest_generator=ManifestGenerator.V2, vod_dash_manifests=[ManifestResource(manifest_id=dash_manifest.id)], vod_hls_manifests=[ManifestResource(manifest_id=hls_manifest.id)])
+    start_encoding_request = StartEncodingRequest(
+        manifest_generator=ManifestGenerator.V2,
+        vod_dash_manifests=[ManifestResource(manifest_id=dash_manifest.id)],
+        #vod_hls_manifests=[ManifestResource(manifest_id=hls_manifest.id)]
+    )
     _execute_encoding(encoding=encoding, start_encoding_request=start_encoding_request)
 
 def _create_encoding(name, description):
@@ -99,9 +111,14 @@ def _create_drm_config(encoding, muxing, output, output_path):
     return bitmovin_api.encoding.encodings.muxings.fmp4.drm.cenc.create(encoding_id=encoding.id, muxing_id=muxing.id, cenc_drm=cenc_drm)
 
 
-def _create_fmp4_muxing(encoding, output, output_path, stream):
-    muxing_stream = MuxingStream(stream_id=stream.id)
-    muxing = Fmp4Muxing(segment_length=4.0, streams=[muxing_stream], outputs=[_build_encoding_output(output, output_path)])
+#def _create_fmp4_muxing(encoding, output, output_path, stream):
+#    muxing_stream = MuxingStream(stream_id=stream.id)
+#    muxing = Fmp4Muxing(segment_length=4.0, streams=[muxing_stream], outputs=[_build_encoding_output(output, output_path)])
+#    #_create_drm_config(encoding=encoding, muxing=muxing, output=output, output_path=output_path)
+#    return bitmovin_api.encoding.encodings.muxings.fmp4.create(encoding_id=encoding.id, fmp4_muxing=muxing)
+
+def _create_fmp4_muxing(encoding, stream):
+    muxing = Fmp4Muxing(segment_length=4.0, streams=[MuxingStream(stream_id=stream.id)])
     return bitmovin_api.encoding.encodings.muxings.fmp4.create(encoding_id=encoding.id, fmp4_muxing=muxing)
 
 def _create_default_dash_manifest(encoding, output, output_path):

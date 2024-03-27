@@ -12,6 +12,7 @@ from bitmovin_api_sdk import *
 
 # Hardcoded configuration parameters
 
+# Hardcoded configuration parameters
 BITMOVIN_API_KEY = ""
 HTTP_INPUT_HOST = ""
 HTTP_INPUT_FILE_PATH = "" #when you get the shareable link from dropbox, everything from the backslash onwards should go here. Change dl=0 to dl=1
@@ -64,13 +65,13 @@ def main():
     _create_drm_config(encoding=encoding, muxing=video_muxing, output=output, output_path="video")
     _create_drm_config(encoding=encoding, muxing=audio_muxing, output=output, output_path="audio")
 
-    #dash_manifest = _create_default_dash_manifest(encoding=encoding, output=output, output_path="")
-    hls_manifest = _create_default_hls_manifest(encoding=encoding, output=output, output_path="")
+    dash_manifest = _create_default_dash_manifest(encoding=encoding, output=output, output_path="")
+    #hls_manifest = _create_default_hls_manifest(encoding=encoding, output=output, output_path="")
 
     start_encoding_request = StartEncodingRequest(
         manifest_generator=ManifestGenerator.V2,
-        #vod_dash_manifests=[ManifestResource(manifest_id=dash_manifest.id)],
-        vod_hls_manifests=[ManifestResource(manifest_id=hls_manifest.id)]
+        vod_dash_manifests=[ManifestResource(manifest_id=dash_manifest.id)],
+        #vod_hls_manifests=[ManifestResource(manifest_id=hls_manifest.id)]
     )
 
     _execute_encoding(encoding=encoding, start_encoding_request=start_encoding_request)
@@ -116,11 +117,11 @@ def _create_fmp4_muxing(encoding, stream):
     return bitmovin_api.encoding.encodings.muxings.fmp4.create(encoding_id=encoding.id, fmp4_muxing=muxing)
 
 def _create_drm_config(encoding, muxing, output, output_path):
-    #widevine_drm = CencWidevine(pssh=DRM_WIDEVINE_PSSH)
-    #playready_drm = CencPlayReady(la_url=DRM_FAIRPLAY_LAURL)
+    widevine_drm = CencWidevine(pssh=DRM_WIDEVINE_PSSH)
+    playready_drm = CencPlayReady(la_url=DRM_FAIRPLAY_LAURL)
     fairplay_drm = CencFairPlay(iv=DRM_FAIRPLAY_IV,uri=DRM_FAIRPLAY_URI)
-    #cenc_drm = CencDrm(outputs=[_build_encoding_output(output=output, output_path=output_path)], key=DRM_KEY, kid=DRM_WIDEVINE_KID, play_ready=playready_drm, widevine=widevine_drm, fair_play=fairplay_drm)
-    cenc_drm = CencDrm(outputs=[_build_encoding_output(output=output, output_path=output_path)], key=DRM_KEY, fair_play=fairplay_drm)
+    cenc_drm = CencDrm(outputs=[_build_encoding_output(output=output, output_path=output_path)], key=DRM_KEY, kid=DRM_WIDEVINE_KID, play_ready=playready_drm, widevine=widevine_drm, fair_play=fairplay_drm)
+    #cenc_drm = CencDrm(outputs=[_build_encoding_output(output=output, output_path=output_path)], key=DRM_KEY, fair_play=fairplay_drm)
     return bitmovin_api.encoding.encodings.muxings.fmp4.drm.cenc.create(encoding_id=encoding.id, muxing_id=muxing.id, cenc_drm=cenc_drm)
 
 def _create_default_dash_manifest(encoding, output, output_path):
